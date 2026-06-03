@@ -1,0 +1,11 @@
+{
+  "cv_accuracy_mean": 0.9822989746357258,
+  "cv_accuracy_std": 0.0033511440250966083,
+  "cv_f1_weighted_mean": 0.9819939563253153,
+  "cv_f1_weighted_std": 0.00347214686103759,
+  "cv_roc_auc_mean": 0.9787073956294847,
+  "cv_roc_auc_std": 0.007045322469612635,
+  "test_accuracy": 0.9814415192058696,
+  "test_f1_weighted": 0.9810802362686607,
+  "test_roc_auc": 0.9828429838288992
+}
