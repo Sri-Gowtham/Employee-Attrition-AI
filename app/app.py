@@ -19,15 +19,21 @@ import plotly.express as px
 import plotly.graph_objects as go
 import shap
 import matplotlib.pyplot as plt
+from sklearn.metrics import (
+    confusion_matrix, roc_curve, auc,
+    precision_score, recall_score, accuracy_score,
+    f1_score, roc_auc_score,
+)
 
 from predict import load_pipeline, predict_single, predict_batch
-from data_preprocessing import EXPECTED_DEPARTMENTS, EXPECTED_SALARY_LEVELS
+from data_preprocessing import EXPECTED_DEPARTMENTS, EXPECTED_SALARY_LEVELS, load_and_prepare
+from prescriptive_engine import generate_recommendations, format_report_markdown
 
 # ---------------------------------------------------------------------------
 # Config & Styling
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Workforce Analytics Platform V4",
+    page_title="Workforce Analytics Platform V5",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -105,7 +111,7 @@ def get_analytics_data():
             # Predict using the loaded model
             df_pred = predict_batch(pipeline, df)
             # Add risk level string for analytics
-            df_pred['Risk_Category'] = df_pred['probability_quit'].apply(lambda p: get_risk_level(p)[0].split(" ")[0])
+            df_pred['Risk_Category'] = df_pred['probability_quit'].apply(lambda p: get_risk_level(p)[0])
             return df_pred
         return df
     except Exception as e:
@@ -113,6 +119,18 @@ def get_analytics_data():
         return pd.DataFrame()
 
 analytics_df = get_analytics_data()
+
+@st.cache_data
+def get_test_evaluation():
+    """Reconstruct test split and compute detailed evaluation metrics."""
+    data_path = Path(__file__).parent.parent / "data" / "employee_data.csv"
+    try:
+        X_train, X_test, y_train, y_test = load_and_prepare(data_path, test_size=0.20, random_state=42)
+        y_pred = pipeline.predict(X_test)
+        y_proba = pipeline.predict_proba(X_test)[:, 1]
+        return y_test.values, y_pred, y_proba
+    except Exception as e:
+        return None, None, None
 
 # ---------------------------------------------------------------------------
 # Sidebar Layout
@@ -187,13 +205,14 @@ if submit_button:
 # ---------------------------------------------------------------------------
 # Main Content
 # ---------------------------------------------------------------------------
-st.title("💼 Workforce Analytics Platform V4")
+st.title("💼 Workforce Analytics Platform V5")
 
-tab_home, tab_analytics, tab_single, tab_explain, tab_batch, tab_insights = st.tabs([
+tab_home, tab_analytics, tab_single, tab_explain, tab_recommend, tab_batch, tab_insights = st.tabs([
     "🏠 Home", 
     "📊 Workforce Analytics",
     "👤 Single Prediction", 
     "🧠 Explain Prediction", 
+    "🎯 Retention Strategy",
     "📂 Batch Prediction", 
     "📈 Model Metrics"
 ])
@@ -202,13 +221,14 @@ tab_home, tab_analytics, tab_single, tab_explain, tab_batch, tab_insights = st.t
 with tab_home:
     st.markdown("""
     ## Executive Dashboard Overview
-    Welcome to the **Workforce Analytics Platform V4**. This application provides comprehensive insights into employee retention, 
-    powered by an advanced Random Forest Machine Learning model. 
+    Welcome to the **Workforce Analytics Platform V5**. This application provides comprehensive insights into employee retention, 
+    powered by an advanced Random Forest Machine Learning model and a Prescriptive Recommendation Engine.
     
     ### Key Capabilities:
     * **Workforce Analytics:** Executive-level dashboards filtering historical and predicted data.
     * **Single Prediction:** Real-time attrition probability for prospective or current employees.
     * **Explainable AI (SHAP):** Transparent breakdown of exactly why the AI made a specific prediction.
+    * **Retention Strategy:** Prescriptive recommendations on how to retain employees based on risk factors.
     * **Batch Processing:** Evaluate hundreds of employees instantly via CSV upload.
     """)
     
@@ -232,7 +252,7 @@ with tab_analytics:
         total_emp = len(filtered_df)
         predicted_leave = filtered_df['predicted_quit'].sum()
         attrition_rate = predicted_leave / total_emp if total_emp > 0 else 0
-        high_risk = len(filtered_df[filtered_df['Risk_Category'] == 'High'])
+        high_risk = len(filtered_df[filtered_df['Risk_Category'] == 'High Risk'])
         avg_sat = filtered_df['satisfaction_level'].mean()
         avg_tenure = filtered_df['time_spend_company'].mean()
         
@@ -287,7 +307,7 @@ with tab_analytics:
             
         with c4:
             st.markdown("#### D. Satisfaction Analytics")
-            fig_sat = px.box(filtered_df, x='risk_label', y='satisfaction_level', color='risk_label',
+            fig_sat = px.box(filtered_df, x='Risk_Category', y='satisfaction_level', color='Risk_Category',
                              title="Satisfaction Distribution by Risk Segment")
             st.plotly_chart(fig_sat, use_container_width=True)
 
@@ -305,7 +325,7 @@ with tab_analytics:
             st.markdown("#### F. Risk Analytics")
             risk_counts = filtered_df['Risk_Category'].value_counts().reset_index()
             risk_counts.columns = ['Risk', 'Count']
-            color_map = {'Low': 'green', 'Medium': 'orange', 'High': 'red'}
+            color_map = {'Low Risk': 'green', 'Medium Risk': 'orange', 'High Risk': 'red'}
             fig_risk = px.pie(risk_counts, values='Count', names='Risk', hole=0.4, 
                               color='Risk', color_discrete_map=color_map,
                               title="Employee Risk Segmentation")
@@ -379,7 +399,7 @@ with tab_single:
             fig.update_layout(height=200, margin=dict(l=10, r=10, t=30, b=10))
             st.plotly_chart(fig, use_container_width=True)
             
-        st.info("💡 Go to the **Explain Prediction** tab to see why the model made this prediction.")
+        st.info("💡 Go to the **Explain Prediction** tab to see why the model made this prediction, and **Retention Strategy** to see how to retain them.")
             
     else:
         st.info("👈 Enter employee details in the sidebar and click 'Predict Attrition' to see results.")
@@ -469,6 +489,62 @@ with tab_explain:
     else:
         st.info("Make a prediction in the sidebar to see the explanation here.")
 
+# --- RETENTION STRATEGY TAB ---
+with tab_recommend:
+    st.subheader("🎯 Retention Strategy & Recommendations")
+    
+    if st.session_state.prediction_result and st.session_state.employee_data:
+        prob_quit = st.session_state.prediction_result['probability_quit']
+        employee_data = st.session_state.employee_data
+        
+        # Generate recommendations
+        recs_result = generate_recommendations(employee_data, prob_quit)
+        
+        # Estimated Impact
+        st.markdown("### Estimated Retention Impact")
+        colA, colB = st.columns(2)
+        with colA:
+            st.metric("Current Attrition Risk", f"{recs_result['current_risk']:.1%}")
+        with colB:
+            st.metric("Estimated Risk if Actions Taken", f"{recs_result['estimated_new_risk']:.1%}", delta=f"{-abs(recs_result['current_risk'] - recs_result['estimated_new_risk']):.1%}", delta_color="inverse")
+            
+        st.divider()
+        
+        # Helper for cards
+        def display_recs(rec_list, title, icon):
+            if rec_list:
+                st.markdown(f"#### {icon} {title}")
+                for r in rec_list:
+                    color = "red" if r['severity'] == "Critical" else "orange" if r['severity'] == "High" else "blue" if r['severity'] == "Medium" else "green"
+                    st.markdown(f"""
+                    <div style="background-color: #2b2b2b; padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid {color};">
+                        <h5 style="margin: 0; color: white;">{r['action']}</h5>
+                        <p style="margin: 5px 0 0 0; color: #d0d0d0; font-size: 14px;">{r['reason']}</p>
+                        <span style="font-size: 12px; font-weight: bold; color: {color};">Priority: {r['severity']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            display_recs(recs_result['immediate'], "Immediate Actions", "🚨")
+            if not recs_result['immediate']:
+                st.info("No immediate actions required.")
+        with col2:
+            display_recs(recs_result['short_term'], "Short-Term Actions", "📅")
+            if not recs_result['short_term']:
+                st.info("No short-term actions required.")
+        with col3:
+            display_recs(recs_result['long_term'], "Long-Term Actions", "📈")
+            if not recs_result['long_term']:
+                st.info("No long-term actions required.")
+                
+        st.divider()
+        md_report = format_report_markdown(recs_result, employee_data)
+        st.download_button("Download Recommendation Report", md_report, file_name="retention_strategy_report.md", mime="text/markdown")
+    else:
+        st.info("Make a prediction in the sidebar to generate a retention strategy.")
+
+
 # --- BATCH PREDICTION TAB ---
 with tab_batch:
     st.subheader("Batch Prediction from CSV")
@@ -505,22 +581,100 @@ with tab_batch:
 
 # --- MODEL METRICS TAB ---
 with tab_insights:
-    st.subheader("Feature Importance")
     if pipeline is not None:
+        # Compute test evaluation metrics
+        y_test, y_pred, y_proba = get_test_evaluation()
+
+        if y_test is not None:
+            # Classification Summary KPIs
+            st.subheader("📊 Classification Summary")
+
+            acc = accuracy_score(y_test, y_pred)
+            prec = precision_score(y_test, y_pred)
+            rec = recall_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred, average='weighted')
+            roc = roc_auc_score(y_test, y_proba)
+
+            m1, m2, m3, m4, m5 = st.columns(5)
+            m1.metric("Accuracy", f"{acc:.2%}")
+            m2.metric("Precision", f"{prec:.2%}")
+            m3.metric("Recall", f"{rec:.2%}")
+            m4.metric("F1 Score", f"{f1:.2%}")
+            m5.metric("ROC-AUC", f"{roc:.2%}")
+
+            st.divider()
+
+            # Confusion Matrix and ROC Curve side by side
+            cm_col, roc_col = st.columns(2)
+
+            with cm_col:
+                st.markdown("#### Confusion Matrix")
+                cm = confusion_matrix(y_test, y_pred)
+                labels = ["Stayed", "Quit"]
+
+                fig_cm = go.Figure(data=go.Heatmap(
+                    z=cm[::-1],
+                    x=labels,
+                    y=labels[::-1],
+                    text=[[str(val) for val in row] for row in cm[::-1]],
+                    texttemplate="%{text}",
+                    textfont={"size": 18},
+                    colorscale="Blues",
+                    showscale=False,
+                ))
+                fig_cm.update_layout(
+                    xaxis_title="Predicted",
+                    yaxis_title="Actual",
+                    height=400,
+                )
+                st.plotly_chart(fig_cm, use_container_width=True)
+
+            with roc_col:
+                st.markdown("#### ROC Curve")
+                fpr, tpr, _ = roc_curve(y_test, y_proba)
+                roc_auc_val = auc(fpr, tpr)
+
+                fig_roc = go.Figure()
+                fig_roc.add_trace(go.Scatter(
+                    x=fpr, y=tpr,
+                    mode='lines',
+                    name=f'ROC Curve (AUC = {roc_auc_val:.4f})',
+                    line=dict(color='#636EFA', width=2),
+                ))
+                fig_roc.add_trace(go.Scatter(
+                    x=[0, 1], y=[0, 1],
+                    mode='lines',
+                    name='Random Baseline',
+                    line=dict(color='gray', width=1, dash='dash'),
+                ))
+                fig_roc.update_layout(
+                    xaxis_title="False Positive Rate",
+                    yaxis_title="True Positive Rate",
+                    height=400,
+                    legend=dict(x=0.4, y=0.1),
+                )
+                st.plotly_chart(fig_roc, use_container_width=True)
+        else:
+            st.warning("Could not compute evaluation metrics. Ensure data/employee_data.csv is available.")
+
+        st.divider()
+
+        # Feature Importance (existing)
+        st.subheader("🌲 Feature Importance")
         try:
             model = pipeline.named_steps.get('classifier', pipeline.steps[-1][1])
             preprocessor = pipeline.named_steps.get('preprocessor', pipeline.steps[0][1])
-            
+
             if hasattr(model, 'feature_importances_'):
                 importances = model.feature_importances_
                 feature_names = preprocessor.get_feature_names_out()
                 clean_names = [name.split('__')[-1] for name in feature_names]
-                
+
                 imp_df = pd.DataFrame({
                     'Feature': clean_names,
                     'Importance': importances
                 }).sort_values(by='Importance', ascending=True)
-                
+
                 fig = px.bar(imp_df, x='Importance', y='Feature', orientation='h',
                              title="Global Feature Importance in Random Forest Model")
                 st.plotly_chart(fig, use_container_width=True)

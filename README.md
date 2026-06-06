@@ -156,16 +156,25 @@ python src/predict.py --input-csv data/new_hires.csv --output-csv predictions.cs
 
 ## 📸 Screenshots
 
-*(Replace these placeholder links with actual screenshots of your running application)*
+*Capture screenshots of the running application and save them in `assets/screenshots/`.*
 
-### Workforce Analytics Dashboard
-![Workforce Analytics Dashboard](https://via.placeholder.com/800x400.png?text=Workforce+Analytics+Dashboard+Screenshot)
+### Home Dashboard
+![Home Dashboard](assets/screenshots/home.png)
 
-### Explainable AI (SHAP Waterfall)
-![SHAP Explanation](https://via.placeholder.com/800x400.png?text=SHAP+Waterfall+Plot+Screenshot)
+### Workforce Analytics
+![Workforce Analytics](assets/screenshots/workforce_analytics.png)
 
-### Single Prediction Form
-![Single Prediction](https://via.placeholder.com/800x400.png?text=Single+Prediction+Screenshot)
+### Single Prediction
+![Single Prediction](assets/screenshots/prediction.png)
+
+### Explainable AI (SHAP)
+![Explainability](assets/screenshots/explainability.png)
+
+### Retention Strategy
+![Retention Strategy](assets/screenshots/retention_strategy.png)
+
+### Batch Prediction
+![Batch Prediction](assets/screenshots/batch_prediction.png)
 
 ---
 
