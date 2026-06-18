@@ -62,6 +62,46 @@ st.markdown("""
         font-size: 28px;
         font-weight: bold;
     }
+    .executive-card {
+        background-color: #2b2b2b;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        border-top: 4px solid #1f77b4;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .executive-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        color: #a0aec0;
+        margin-bottom: 5px;
+        letter-spacing: 1px;
+    }
+    .executive-value {
+        font-size: 32px;
+        font-weight: 800;
+        color: #ffffff;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .status-excellent { background-color: #1b5e20; color: #a5d6a7; border: 1px solid #4caf50; }
+    .status-good { background-color: #33691e; color: #c5e1a5; border: 1px solid #8bc34a; }
+    .status-moderate { background-color: #e65100; color: #ffcc80; border: 1px solid #ff9800; }
+    .status-critical { background-color: #b71c1c; color: #ef9a9a; border: 1px solid #f44336; }
+    
+    .summary-box {
+        background-color: #1e1e1e;
+        border-left: 5px solid #1f77b4;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -246,7 +286,95 @@ with tab_analytics:
     if filtered_df.empty:
         st.warning("No data available or filters are too restrictive.")
     else:
-        st.subheader("Executive KPIs")
+        total_emp = len(filtered_df)
+        predicted_leave = filtered_df['predicted_quit'].sum()
+        attrition_rate = predicted_leave / total_emp if total_emp > 0 else 0
+        high_risk = len(filtered_df[filtered_df['Risk_Category'] == 'High Risk'])
+        avg_sat = filtered_df['satisfaction_level'].mean()
+        avg_tenure = filtered_df['time_spend_company'].mean()
+
+        # --- EXECUTIVE SUMMARY PANEL ---
+        st.header("Executive Workforce Health Report")
+        
+        # Calculate Executive Metrics
+        health_score = (avg_sat * 0.6 + (1 - attrition_rate) * 0.4) * 100
+        high_risk_pct = (high_risk / total_emp) * 100 if total_emp > 0 else 0
+        retention_readiness = (1 - high_risk / total_emp) * 100 if total_emp > 0 else 0
+        
+        if health_score > 85:
+            risk_level, badge_class = "Excellent", "status-excellent"
+        elif health_score > 75:
+            risk_level, badge_class = "Good", "status-good"
+        elif health_score > 60:
+            risk_level, badge_class = "Moderate", "status-moderate"
+        else:
+            risk_level, badge_class = "Critical", "status-critical"
+            
+        # KPI Cards
+        ec1, ec2, ec3, ec4 = st.columns(4)
+        
+        with ec1:
+            st.markdown(f"""
+            <div class="executive-card">
+                <div class="executive-title">Workforce Health Score</div>
+                <div class="executive-value">{health_score:.0f}/100</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with ec2:
+            st.markdown(f"""
+            <div class="executive-card" style="border-top-color: {'#4caf50' if health_score > 75 else '#ff9800' if health_score > 60 else '#f44336'};">
+                <div class="executive-title">Attrition Risk Level</div>
+                <div style="margin-top: 10px;"><span class="status-badge {badge_class}">{risk_level}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with ec3:
+            st.markdown(f"""
+            <div class="executive-card" style="border-top-color: #f44336;">
+                <div class="executive-title">Critical Employees</div>
+                <div class="executive-value">{high_risk:,} <span style="font-size: 16px; color: #ef9a9a;">({high_risk_pct:.1f}%)</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with ec4:
+            st.markdown(f"""
+            <div class="executive-card" style="border-top-color: #9c27b0;">
+                <div class="executive-title">Retention Readiness</div>
+                <div class="executive-value">{retention_readiness:.1f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Generate Dynamic Executive Summary
+        dept_stats = filtered_df.groupby('department').agg(
+            Count=('department', 'count'),
+            Attrition=('predicted_quit', 'mean')
+        ).reset_index().sort_values('Attrition', ascending=False)
+        
+        highest_risk_dept = dept_stats.iloc[0]['department'].title() if not dept_stats.empty else "N/A"
+        
+        if health_score > 75:
+            summary_intro = "Overall workforce is highly stable with low attrition exposure."
+            action_text = f"Continue current retention strategies and monitor the {highest_risk_dept} department for any emerging trends."
+        elif health_score > 60:
+            summary_intro = "Overall workforce is stable with moderate attrition exposure."
+            action_text = f"Prioritize retention initiatives and salary reviews for the {highest_risk_dept} department."
+        else:
+            summary_intro = "Workforce is experiencing critical instability with high attrition exposure."
+            action_text = f"Immediate intervention required! Conduct urgent retention interviews in the {highest_risk_dept} department."
+            
+        st.markdown(f"""
+        <div class="summary-box">
+            <h4 style="margin-top: 0; color: #64b5f6;">Executive Summary</h4>
+            <p style="font-size: 16px;"><strong>Workforce Health Score: {health_score:.0f}/100</strong></p>
+            <p style="font-size: 16px;">{summary_intro}</p>
+            <p style="font-size: 16px;"><strong>Key Concern:</strong> {highest_risk_dept} department shows elevated attrition risk.</p>
+            <p style="font-size: 16px; margin-bottom: 0;"><strong>Recommended Action:</strong> {action_text}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.divider()
+        st.subheader("General KPIs")
         
         # Calculate KPIs
         total_emp = len(filtered_df)
