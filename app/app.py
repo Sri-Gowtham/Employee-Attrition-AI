@@ -52,11 +52,14 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         text-align: center;
         color: white;
+        border-top: 4px solid #2563eb;
     }
     .metric-title {
         font-size: 14px;
         color: #a0aec0;
         margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     .metric-value {
         font-size: 28px;
@@ -67,8 +70,28 @@ st.markdown("""
         border-radius: 8px;
         padding: 15px;
         text-align: center;
-        border-top: 4px solid #1f77b4;
+        border-top: 4px solid #2563eb;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .project-banner {
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .project-banner h1 {
+        color: white;
+        margin: 0;
+        font-size: 36px;
+        font-weight: 800;
+        letter-spacing: 1px;
+    }
+    .project-banner p {
+        color: #e2e8f0;
+        margin: 10px 0 0 0;
+        font-size: 18px;
     }
     .executive-title {
         font-size: 13px;
@@ -245,7 +268,12 @@ if submit_button:
 # ---------------------------------------------------------------------------
 # Main Content
 # ---------------------------------------------------------------------------
-st.title("💼 Workforce Analytics Platform V5")
+st.markdown("""
+<div class="project-banner">
+    <h1>💼 Workforce Analytics Platform V5</h1>
+    <p>Predictive Attrition Intelligence & Retention Strategy</p>
+</div>
+""", unsafe_allow_html=True)
 
 tab_home, tab_analytics, tab_single, tab_explain, tab_recommend, tab_batch, tab_insights = st.tabs([
     "🏠 Home", 
@@ -275,9 +303,12 @@ with tab_home:
     st.markdown("### Core Model Performance")
     if metrics:
         col1, col2, col3 = st.columns(3)
-        col1.metric("Test Accuracy", f"{metrics.get('test_accuracy', 0):.2%}")
-        col2.metric("Test F1 Score", f"{metrics.get('test_f1_weighted', 0):.2%}")
-        col3.metric("Test ROC AUC", f"{metrics.get('test_roc_auc', 0):.2%}")
+        with col1:
+            st.markdown(f'<div class="metric-card"><div class="metric-title">Test Accuracy</div><div class="metric-value">{metrics.get("test_accuracy", 0):.2%}</div></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="metric-card"><div class="metric-title">Test F1 Score</div><div class="metric-value">{metrics.get("test_f1_weighted", 0):.2%}</div></div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown(f'<div class="metric-card"><div class="metric-title">Test ROC AUC</div><div class="metric-value">{metrics.get("test_roc_auc", 0):.2%}</div></div>', unsafe_allow_html=True)
     else:
         st.info("Metrics not found.")
 
@@ -385,19 +416,19 @@ with tab_analytics:
         avg_tenure = filtered_df['time_spend_company'].mean()
         
         k1, k2, k3, k4, k5, k6 = st.columns(6)
-        k1.metric("Total Employees", f"{total_emp:,}")
-        k2.metric("Predicted to Leave", f"{predicted_leave:,}")
-        k3.metric("Attrition Rate", f"{attrition_rate:.1%}")
-        k4.metric("High Risk", f"{high_risk:,}")
-        k5.metric("Avg Satisfaction", f"{avg_sat:.2f}")
-        k6.metric("Avg Tenure (Yrs)", f"{avg_tenure:.1f}")
+        with k1: st.markdown(f'<div class="metric-card"><div class="metric-title">Total Employees</div><div class="metric-value">{total_emp:,}</div></div>', unsafe_allow_html=True)
+        with k2: st.markdown(f'<div class="metric-card"><div class="metric-title">Predicted to Leave</div><div class="metric-value">{predicted_leave:,}</div></div>', unsafe_allow_html=True)
+        with k3: st.markdown(f'<div class="metric-card"><div class="metric-title">Attrition Rate</div><div class="metric-value">{attrition_rate:.1%}</div></div>', unsafe_allow_html=True)
+        with k4: st.markdown(f'<div class="metric-card"><div class="metric-title">High Risk</div><div class="metric-value">{high_risk:,}</div></div>', unsafe_allow_html=True)
+        with k5: st.markdown(f'<div class="metric-card"><div class="metric-title">Avg Satisfaction</div><div class="metric-value">{avg_sat:.2f}</div></div>', unsafe_allow_html=True)
+        with k6: st.markdown(f'<div class="metric-card"><div class="metric-title">Avg Tenure (Yrs)</div><div class="metric-value">{avg_tenure:.1f}</div></div>', unsafe_allow_html=True)
         
         st.divider()
         
         # Row 1: Dept and Salary
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("#### A. Department Analytics")
+            st.markdown("#### 🏢 A. Department Analytics")
             dept_stats = filtered_df.groupby('department').agg(
                 Count=('department', 'count'),
                 Attrition=('predicted_quit', 'mean')
@@ -407,10 +438,11 @@ with tab_analytics:
                               hover_data=['Count'], text_auto='.1%',
                               labels={'Attrition': 'Attrition Rate', 'department': 'Department'},
                               title="Attrition Rate by Department")
+            fig_dept.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_dept, use_container_width=True)
             
         with c2:
-            st.markdown("#### B. Salary Analytics")
+            st.markdown("#### 💰 B. Salary Analytics")
             sal_stats = filtered_df.groupby('salary').agg(
                 Count=('salary', 'count'),
                 Attrition=('predicted_quit', 'mean')
@@ -419,44 +451,51 @@ with tab_analytics:
             fig_sal = px.bar(sal_stats, x='salary', y='Attrition', 
                              color='salary', text_auto='.1%',
                              title="Attrition Rate by Salary Level")
+            fig_sal.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_sal, use_container_width=True)
             
         # Row 2: Promo and Satisfaction
+        st.divider()
         c3, c4 = st.columns(2)
         with c3:
-            st.markdown("#### C. Promotion Analytics")
+            st.markdown("#### 📈 C. Promotion Analytics")
             promo_stats = filtered_df.groupby(['promotion_last_5years', 'predicted_quit']).size().reset_index(name='Count')
             promo_stats['promotion_last_5years'] = promo_stats['promotion_last_5years'].map({0: 'No', 1: 'Yes'})
             promo_stats['predicted_quit'] = promo_stats['predicted_quit'].map({0: 'Stay', 1: 'Leave'})
             
             fig_promo = px.bar(promo_stats, x='promotion_last_5years', y='Count', color='predicted_quit', 
                                barmode='group', title="Attrition vs Promotion Status (Last 5 Yrs)")
+            fig_promo.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_promo, use_container_width=True)
             
         with c4:
-            st.markdown("#### D. Satisfaction Analytics")
+            st.markdown("#### 😊 D. Satisfaction Analytics")
             fig_sat = px.box(filtered_df, x='Risk_Category', y='satisfaction_level', color='Risk_Category',
                              title="Satisfaction Distribution by Risk Segment")
+            fig_sat.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_sat, use_container_width=True)
 
         # Row 3: Tenure and Risk
+        st.divider()
         c5, c6 = st.columns(2)
         with c5:
-            st.markdown("#### E. Tenure Analytics")
+            st.markdown("#### ⏳ E. Tenure Analytics")
             tenure_stats = filtered_df.groupby('time_spend_company')['predicted_quit'].mean().reset_index()
             fig_tenure = px.line(tenure_stats, x='time_spend_company', y='predicted_quit', markers=True,
                                  title="Attrition Rate by Years at Company")
             fig_tenure.update_yaxes(tickformat='.1%')
+            fig_tenure.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_tenure, use_container_width=True)
             
         with c6:
-            st.markdown("#### F. Risk Analytics")
+            st.markdown("#### ⚠️ F. Risk Analytics")
             risk_counts = filtered_df['Risk_Category'].value_counts().reset_index()
             risk_counts.columns = ['Risk', 'Count']
             color_map = {'Low Risk': 'green', 'Medium Risk': 'orange', 'High Risk': 'red'}
             fig_risk = px.pie(risk_counts, values='Count', names='Risk', hole=0.4, 
                               color='Risk', color_discrete_map=color_map,
                               title="Employee Risk Segmentation")
+            fig_risk.update_layout(font=dict(family="Inter, sans-serif"), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_risk, use_container_width=True)
 
         # AI Insights Panel
@@ -724,11 +763,11 @@ with tab_insights:
             roc = roc_auc_score(y_test, y_proba)
 
             m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("Accuracy", f"{acc:.2%}")
-            m2.metric("Precision", f"{prec:.2%}")
-            m3.metric("Recall", f"{rec:.2%}")
-            m4.metric("F1 Score", f"{f1:.2%}")
-            m5.metric("ROC-AUC", f"{roc:.2%}")
+            with m1: st.markdown(f'<div class="metric-card"><div class="metric-title">Accuracy</div><div class="metric-value">{acc:.2%}</div></div>', unsafe_allow_html=True)
+            with m2: st.markdown(f'<div class="metric-card"><div class="metric-title">Precision</div><div class="metric-value">{prec:.2%}</div></div>', unsafe_allow_html=True)
+            with m3: st.markdown(f'<div class="metric-card"><div class="metric-title">Recall</div><div class="metric-value">{rec:.2%}</div></div>', unsafe_allow_html=True)
+            with m4: st.markdown(f'<div class="metric-card"><div class="metric-title">F1 Score</div><div class="metric-value">{f1:.2%}</div></div>', unsafe_allow_html=True)
+            with m5: st.markdown(f'<div class="metric-card"><div class="metric-title">ROC-AUC</div><div class="metric-value">{roc:.2%}</div></div>', unsafe_allow_html=True)
 
             st.divider()
 
@@ -810,3 +849,12 @@ with tab_insights:
                 st.info("Feature importance not available for this model type.")
         except Exception as e:
             st.warning(f"Could not extract feature importance: {e}")
+
+# ---------------------------------------------------------------------------
+# Footer
+# ---------------------------------------------------------------------------
+st.markdown("""
+<div style="text-align: center; margin-top: 50px; padding-top: 20px; border-top: 1px solid #333;">
+    <p style="color: #888; font-size: 14px;">Version 5.0 | Developed by Sri Gowtham | Machine Learning Internship Project</p>
+</div>
+""", unsafe_allow_html=True)
